@@ -2,6 +2,7 @@ import { Storer } from "../../interfaces/storer";
 import { Product } from "../../types/products";
 import * as mongoDB from "mongodb";
 import { MongoRecord } from "../../types/mongo/mongoRecord";
+import { ValidationError } from "../../types/validationError";
 
 export class MongoProductStore implements Storer<Product> {
   db: mongoDB.Db;
@@ -12,16 +13,16 @@ export class MongoProductStore implements Storer<Product> {
     this.coll = this.db.collection<MongoRecord<Product>>(collName);
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(filterId: string): Promise<void> {
     await this.coll.deleteOne({
-      _id: new mongoDB.ObjectId(id),
+      _id: this.createObjectId(filterId),
     });
   }
 
   async update(filterId: string, body: Product): Promise<Product> {
     await this.coll.updateOne(
       {
-        _id: new mongoDB.ObjectId(filterId),
+        _id: this.createObjectId(filterId),
       },
       {
         $set: body,
@@ -37,9 +38,9 @@ export class MongoProductStore implements Storer<Product> {
     return resp.map((val) => this.mapRespToProduct(val));
   }
 
-  async getByID(searchId: string): Promise<Product | null> {
+  async getByID(filterId: string): Promise<Product | null> {
     const item = await this.coll.findOne({
-      _id: new mongoDB.ObjectId(searchId),
+      _id: this.createObjectId(filterId),
     });
 
     if (!item) return null;
@@ -66,5 +67,13 @@ export class MongoProductStore implements Storer<Product> {
       ...rest,
       id: _id.toString(),
     };
+  }
+
+  private createObjectId(value: string): mongoDB.ObjectId {
+    try {
+      return new mongoDB.ObjectId(value);
+    } catch {
+      throw new ValidationError([{ message: "invalid product ID" }]);
+    }
   }
 }
